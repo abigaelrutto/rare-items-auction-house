@@ -41,6 +41,7 @@ module rare_items_auction::rare_items_auction {
         highest_bid: u64, // Current highest bid amount.
         bids: vector<Bid>, // Vector storing all the bids on the auction.
         pool: Balance<SUI>, // Pool of funds collected from the bids.
+        is_processing: bool, // Reentrancy guard flag.
     }
 
     // Struct to represent a bid in an auction.
@@ -58,6 +59,8 @@ module rare_items_auction::rare_items_auction {
     const EInvalidBid: u64 = 6; // Error for placing a bid that is lower than the highest bid.
     const EClaimedBid: u64 = 7; // Error when trying to withdraw an already claimed bid.
     const ENoAuctions: u64 = 8; // Error when there are no auctions available.
+    const ENoHighestBidder: u64 = 9; // Error when no highest bidder is found.
+    const EReentrancyGuard: u64 = 10; // Error for reentrancy guard.
 
     // Functions for managing the rare items auction contract.
 
@@ -118,6 +121,7 @@ module rare_items_auction::rare_items_auction {
             highest_bid: 0, // Highest bid starts at zero.
             bids: vector::empty(), // Initialize an empty list of bids.
             pool: balance::zero<SUI>(), // Initialize the auction pool with zero balance.
+            is_processing: false, // Initialize reentrancy guard flag.
         };
         transfer::share_object(auction); // Share the auction object.
         vector::push_back(&mut auction_house.auctions, inner); // Add the auction to the auction house's list of auctions.
@@ -149,6 +153,7 @@ module rare_items_auction::rare_items_auction {
         let bid_amount = coin::into_balance(amount); // Convert the bid amount to balance.
         balance::join(&mut auction.pool, bid_amount); // Add the bid amount to the auction pool.
 
+        // Batch update highest bid and bidder
         auction.highest_bid = amount_u64; // Update the highest bid.
         auction.highest_bidder = some(bidder); // Update the highest bidder.
         auction.bids.push_back(bid); // Add the bid to the list of bids.
@@ -169,18 +174,24 @@ module rare_items_auction::rare_items_auction {
         let highest_bidder = if (option::is_some(&auction.highest_bidder)) {
             option::borrow(&auction.highest_bidder)
         } else {
-            abort(ENoAuctions) // Abort if no highest bidder is found.
+            abort(ENoHighestBidder) // Abort if no highest bidder is found.
         };
         assert!(bid.bidder == highest_bidder, ENotBidder); // Ensure the bid belongs to the highest bidder.
 
         let highest_bid = auction.highest_bid; // Get the highest bid amount.
 
+        // Reentrancy guard
+        assert!(!auction.is_processing, EReentrancyGuard);
+        auction.is_processing = true;
+
         // Transfer the item to the highest bidder.
         item.owner = bid.bidder;
-        bid.is_claimed = true; // Markthe bid as claimed.
+        bid.is_claimed = true; // Mark the bid as claimed.
 
         let bid_amount = coin::take(&mut auction.pool, highest_bid, ctx); // Withdraw the bid amount from the auction pool.
         transfer::public_transfer(bid_amount, auction.seller); // Transfer the funds to the seller.
+
+        auction.is_processing = false;
     }
 
     // Allows a bidder to withdraw their bid.
