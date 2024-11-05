@@ -4,9 +4,14 @@ module auction::helpers {
 
     const ADMIN: address = @0xe;
 
-    public fun init_test_helper() : ts::Scenario{
+    use auction::rare_items_auction::test_init;
 
-       let  scenario_val = ts::begin(ADMIN);
+    public fun init_test_helper() : ts::Scenario {
+        
+       let mut scenario_val = ts::begin(ADMIN);
+       let scenario = &mut scenario_val;
+        
+       test_init(ts::ctx(scenario));
        scenario_val
     }
 

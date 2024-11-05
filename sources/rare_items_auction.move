@@ -32,7 +32,7 @@ module auction::rare_items_auction {
     // Struct to represent an auction.
     public struct Auction has key, store {
         id: UID, // Unique identifier for the auction.
-        item_id: UID, // The item being auctioned.
+        item_id: ID, // The item being auctioned.
         seller: address, // Address of the seller of the item.
         starting_price: u64, // Starting price of the item in SUI tokens.
         end_time: u64, // Timestamp for the end time of the auction.
@@ -96,15 +96,17 @@ module auction::rare_items_auction {
         auction_house: &mut AuctionHouseCap, // Reference to the auction house.
         item: &Item, // Reference to the item being auctioned.
         seller: address, // Address of the seller.
-        item_id: UID, // Unique ID of the item being auctioned.
         starting_price: u64, // The starting price of the item.
-        end_time: u64, // Auction end time in milliseconds.
+        end_times: u64, // Auction end time in milliseconds.
         reserve_price: u64, // Reserve price, the minimum acceptable bid.
+        c:&Clock,
         ctx: &mut TxContext
     ) {
         // Verify that the caller is the owner of the item.
         assert!(item.owner == tx_context::sender(ctx), ENotBidder);
 
+        let end_time = c.timestamp_ms() + end_times;
+        let item_id = object::id(item);
         let id = object::new(ctx); // Create a unique ID for the auction.
         let inner = object::uid_to_inner(&id); // Convert the auction ID to its inner representation.
         let auction = Auction {
@@ -209,5 +211,11 @@ module auction::rare_items_auction {
 
         let withdrawn = coin::take(&mut auction.pool, amount, ctx); // Withdraw the specified amount from the pool.
         transfer::public_transfer(withdrawn, auction.seller); // Transfer the funds to the seller.
-    }        
+    }
+
+    #[test_only]
+    // call the init function
+    public fun test_init(ctx: &mut TxContext) {
+        init( ctx);
+    }      
 }
