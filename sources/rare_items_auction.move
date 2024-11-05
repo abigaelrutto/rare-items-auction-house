@@ -1,5 +1,5 @@
 // Decentralized Rare Items Auction House
-module rare_items_auction::rare_items_auction {
+module auction::rare_items_auction {
     // This module defines the rare items auction contract.
 
     // Importing necessary modules from the standard library and SUI.
